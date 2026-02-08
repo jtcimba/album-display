@@ -8,16 +8,13 @@ from config_manager import ConfigManager
 from wifi_manager import WiFiManager
 from ap_manager import AccessPointManager
 from config_server import ConfigServer
-from display_manager import DisplayManager
-from spotify_client import SpotifyClient
-from wiim_client import WiiMClient
 
 class AlbumDisplay:
     def __init__(self):
         self.config = ConfigManager()
         self.wifi = WiFiManager()
         self.ap = AccessPointManager()
-        self.display = DisplayManager()
+        self.display = None  # Don't initialize display until after config
         self.config_server = None
         self.spotify = None
         self.wiim = None
@@ -33,8 +30,22 @@ class AlbumDisplay:
         self.running = False
         if self.ap.is_running():
             self.ap.stop_ap()
-        self.display.clear()
+        if self.display:
+            self.display.clear()
         sys.exit(0)
+    
+    def check_disable_flag(self):
+        """Check if user wants to disable the service"""
+        flag_file = '/boot/disable-album-display'
+        
+        if os.path.exists(flag_file):
+            print("DISABLE FLAG DETECTED - Service will not start")
+            try:
+                os.remove(flag_file)
+            except:
+                pass
+            return True
+        return False
     
     def check_force_config_flag(self):
         """Check if user wants to force config mode"""
@@ -57,8 +68,7 @@ class AlbumDisplay:
         
         # Step 1: Configure WiFi
         if 'wifi_ssid' in data and 'wifi_password' in data:
-            self.display.show_status(wifi=False, audio=False, 
-                                   message="Connecting to WiFi...")
+            print("Configuring WiFi...")
             
             # Stop AP before connecting to WiFi
             self.ap.stop_ap()
@@ -68,21 +78,21 @@ class AlbumDisplay:
             if self.wifi.connect(data['wifi_ssid'], data['wifi_password']):
                 self.config.update('wifi_ssid', data['wifi_ssid'])
                 self.config.update('wifi_password', data['wifi_password'])
-                self.display.show_status(wifi=True, audio=False)
                 print(f"✓ Connected to WiFi: {data['wifi_ssid']}")
             else:
                 response['errors']['wifi'] = 'Failed to connect to WiFi network'
                 response['success'] = False
                 # Restart AP if WiFi failed
                 self.ap.start_ap()
-                self.display.show_status(wifi=False, audio=False, 
-                                       message="WiFi failed. Try again.")
+                print("WiFi connection failed, restarted AP")
                 return response
         
         # Step 2: Configure Spotify
         if data.get('spotify_access_token'):
-            self.display.show_status(wifi=True, audio=False, 
-                                   message="Testing Spotify...")
+            print("Testing Spotify...")
+            
+            # Import here to avoid loading display manager during config
+            from spotify_client import SpotifyClient
             
             self.spotify = SpotifyClient(
                 data['spotify_access_token'],
@@ -101,8 +111,9 @@ class AlbumDisplay:
         
         # Step 3: Configure WiiM
         if data.get('wiim_ip'):
-            self.display.show_status(wifi=True, audio=False, 
-                                   message="Testing WiiM...")
+            print("Testing WiiM...")
+            
+            from wiim_client import WiiMClient
             
             self.wiim = WiiMClient(data['wiim_ip'])
             
@@ -123,8 +134,6 @@ class AlbumDisplay:
         # Update configuration status
         if response['success']:
             self.config.update('configured', True)
-            self.display.show_status(wifi=True, audio=True, 
-                                   message="Setup complete!")
             print("✓ Configuration complete")
         
         return response
@@ -136,9 +145,7 @@ class AlbumDisplay:
         print(f"{'='*50}")
         
         try:
-            # Show attempting to start AP
-            self.display.show_status(wifi=False, audio=False, 
-                                   message="Starting\nsetup mode...")
+            print("Starting Access Point...")
             
             # Start Access Point
             self.ap.start_ap()
@@ -147,17 +154,13 @@ class AlbumDisplay:
         except Exception as e:
             print(f"CRITICAL ERROR: Failed to start Access Point: {e}")
             
-            # Show error on display with recovery instructions
-            self.display.show_status(wifi=False, audio=False,
-                                   message=f"ERROR!\nAP failed\nUse boot\npartition")
-            
             # Log the error details
             import traceback
             traceback.print_exc()
             
-            # Keep display showing error and log periodically
+            # Keep logging error
             while self.running:
-                print("ERROR: AP mode failed. Waiting for manual recovery...")
+                print("ERROR: AP mode failed. Use boot partition recovery.")
                 print("RECOVERY: Add wpa_supplicant.conf to boot partition")
                 time.sleep(60)
             return
@@ -168,14 +171,8 @@ class AlbumDisplay:
             self.config_server.start(host='0.0.0.0', port=80)
         except Exception as e:
             print(f"ERROR: Failed to start web server: {e}")
-            self.display.show_status(wifi=False, audio=False,
-                                   message=f"ERROR!\nWeb server\nfailed")
             time.sleep(300)
             return
-        
-        # Show success
-        self.display.show_status(wifi=False, audio=False, 
-                               message=f"Connect to:\n{self.ap.AP_SSID}")
         
         print(f"\n{'='*50}")
         print("SETUP INSTRUCTIONS:")
@@ -200,13 +197,20 @@ class AlbumDisplay:
         print("STARTING NORMAL MODE")
         print(f"{'='*50}")
         
+        # NOW initialize display manager (after config is done)
+        print("Initializing display...")
+        from display_manager import DisplayManager
+        self.display = DisplayManager()
+        
         # Initialize audio clients
         if self.config.get('wiim_ip'):
             print(f"Initializing WiiM client ({self.config.get('wiim_ip')})...")
+            from wiim_client import WiiMClient
             self.wiim = WiiMClient(self.config.get('wiim_ip'))
         
         if self.config.get('spotify_access_token'):
             print("Initializing Spotify client...")
+            from spotify_client import SpotifyClient
             self.spotify = SpotifyClient(
                 self.config.get('spotify_access_token'),
                 self.config.get('spotify_refresh_token'),
@@ -263,10 +267,12 @@ class AlbumDisplay:
         print("ALBUM DISPLAY STARTING")
         print(f"{'='*50}\n")
         
-        # Show startup message
-        self.display.show_status(wifi=False, audio=False, 
-                               message="Starting...")
         time.sleep(2)
+        
+        # Check for disable flag
+        if self.check_disable_flag():
+            print("Service disabled by user flag. Exiting.")
+            return
         
         # Check for force config flag
         if self.check_force_config_flag():
@@ -295,8 +301,6 @@ class AlbumDisplay:
             else:
                 # Try to connect
                 print(f"Connecting to {saved_ssid}...")
-                self.display.show_status(wifi=False, audio=False, 
-                                       message="Connecting...")
                 
                 if not self.wifi.connect(saved_ssid, self.config.get('wifi_password')):
                     print(f"✗ Failed to connect to {saved_ssid}")
@@ -312,7 +316,7 @@ class AlbumDisplay:
             if not self.running:
                 return
         
-        # Run normal mode
+        # Run normal mode (display manager initialized here)
         self.run_normal_mode()
 
 if __name__ == '__main__':

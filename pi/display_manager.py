@@ -10,7 +10,7 @@ class DisplayManager:
         options.chain_length = 1
         options.parallel = 1
         options.hardware_mapping = 'adafruit-hat'
-        options.gpio_slowdown = 4
+        options.gpio_slowdown = 5
         options.disable_hardware_pulsing = True
         
         self.matrix = RGBMatrix(options=options)
