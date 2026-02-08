@@ -22,19 +22,22 @@ echo "Installing system dependencies..."
 sudo apt install -y \
     python3-pip \
     python3-dev \
-    python3-pillow \
+    python3-pil \
     git \
-    hostapd \
-    dnsmasq \
     libopenjp2-7 \
-    libtiff5 \
-    libatlas-base-dev
+    libtiff-dev \
+    libatlas3-base \
+    cython3 \
+    libcap2-bin
 
-# Stop services (will be configured later)
-sudo systemctl stop hostapd
-sudo systemctl stop dnsmasq
-sudo systemctl disable hostapd
-sudo systemctl disable dnsmasq
+# Prevent NetworkManager from interfering
+echo "Configuring NetworkManager..."
+sudo mkdir -p /etc/NetworkManager/conf.d
+sudo tee /etc/NetworkManager/conf.d/99-unmanage-wlan.conf > /dev/null <<'EOF'
+[keyfile]
+unmanaged-devices=interface-name:wlan0
+EOF
+sudo systemctl restart NetworkManager 2>/dev/null || true
 
 # Install RGB Matrix library
 if [ ! -d "/home/pi/rpi-rgb-led-matrix" ]; then
@@ -50,6 +53,11 @@ fi
 echo "Installing Python packages..."
 cd /home/pi/album-display/pi
 pip3 install -r requirements.txt --break-system-packages
+
+# Give Python permission to bind to port 80
+echo "Configuring permissions..."
+PYTHON_PATH=$(readlink -f $(which python3))
+sudo setcap CAP_NET_BIND_SERVICE=+eip $PYTHON_PATH
 
 # Create systemd service
 echo "Creating systemd service..."
@@ -75,7 +83,7 @@ EOF
 # Reload systemd
 sudo systemctl daemon-reload
 
-# Enable service
+# Enable service (will start on boot)
 sudo systemctl enable album-display.service
 
 echo ""
@@ -83,12 +91,13 @@ echo "============================================"
 echo "Installation Complete!"
 echo "============================================"
 echo ""
-echo "To start the service:"
-echo "  sudo systemctl start album-display"
+echo "Next steps:"
+echo "  1. Start the service:"
+echo "     sudo systemctl start album-display"
 echo ""
-echo "To view logs:"
-echo "  sudo journalctl -u album-display -f"
+echo "  2. View logs:"
+echo "     sudo journalctl -u album-display -f"
 echo ""
-echo "To enable auto-start on boot (already enabled):"
-echo "  sudo systemctl enable album-display"
+echo "  3. Configure audio sources:"
+echo "     Open browser to http://albumdisplay.local"
 echo ""
