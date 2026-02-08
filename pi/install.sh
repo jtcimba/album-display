@@ -30,18 +30,16 @@ sudo apt install -y \
     cython3 \
     libcap2-bin
 
-# Prevent NetworkManager from interfering
-echo "Configuring NetworkManager..."
+echo "Configuring network settings..."
+# Note: We're NOT restarting NetworkManager to avoid SSH disconnection
+# The unmanaged setting will take effect on next reboot
 sudo mkdir -p /etc/NetworkManager/conf.d
-sudo tee /etc/NetworkManager/conf.d/99-unmanage-wlan.conf > /dev/null <<'EOF'
-[keyfile]
-unmanaged-devices=interface-name:wlan0
-EOF
-sudo systemctl restart NetworkManager 2>/dev/null || true
+echo '[keyfile]' | sudo tee /etc/NetworkManager/conf.d/99-unmanage-wlan.conf > /dev/null
+echo 'unmanaged-devices=interface-name:wlan0' | sudo tee -a /etc/NetworkManager/conf.d/99-unmanage-wlan.conf > /dev/null
 
 # Install RGB Matrix library
 if [ ! -d "/home/pi/rpi-rgb-led-matrix" ]; then
-    echo "Installing RGB Matrix library..."
+    echo "Installing RGB Matrix library (this takes 3-5 minutes)..."
     cd /home/pi
     git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
     cd rpi-rgb-led-matrix
@@ -59,9 +57,9 @@ echo "Configuring permissions..."
 PYTHON_PATH=$(readlink -f $(which python3))
 sudo setcap CAP_NET_BIND_SERVICE=+eip $PYTHON_PATH
 
-# Create systemd service
+# Create systemd service file
 echo "Creating systemd service..."
-sudo tee /etc/systemd/system/album-display.service > /dev/null <<'EOF'
+sudo bash -c 'cat > /etc/systemd/system/album-display.service' << 'EOF'
 [Unit]
 Description=Album Display
 After=network.target
@@ -91,13 +89,12 @@ echo "============================================"
 echo "Installation Complete!"
 echo "============================================"
 echo ""
-echo "Next steps:"
-echo "  1. Start the service:"
-echo "     sudo systemctl start album-display"
+echo "IMPORTANT: Reboot for network settings to take effect:"
+echo "  sudo reboot"
 echo ""
-echo "  2. View logs:"
-echo "     sudo journalctl -u album-display -f"
-echo ""
-echo "  3. Configure audio sources:"
-echo "     Open browser to http://albumdisplay.local"
+echo "After reboot:"
+echo "  1. SSH back in: ssh pi@albumdisplay.local"
+echo "  2. Start service: sudo systemctl start album-display"
+echo "  3. View logs: sudo journalctl -u album-display -f"
+echo "  4. Configure: http://albumdisplay.local"
 echo ""
