@@ -1,27 +1,26 @@
-   # Python
-   __pycache__/
-   *.py[cod]
-   *$py.class
-   *.so
-   .Python
-   env/
-   venv/
-   
-   # Config files
-   *.json
-   album-display-config.json
-   
-   # OS
-   .DS_Store
-   Thumbs.db
-   
-   # IDE
-   .vscode/
-   .idea/
-   *.swp
-   *.swo
-   
-   # Temporary
-   /tmp/
-   *.log
-   EOF
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Config files
+*.json
+album-display-config.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary
+/tmp/
+*.log
