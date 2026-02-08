@@ -29,13 +29,13 @@ class ConfigServer:
         def get_status():
             return jsonify({'ready': True, 'version': '1.0'})
     
-    def get_html_template(self):
+def get_html_template(self):
         """Return the configuration web page HTML"""
         return '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Album Display Setup</title>
+    <title>Album Display Configuration</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * {
@@ -92,8 +92,7 @@ class ConfigServer:
             font-size: 20px;
         }
         
-        input[type="text"],
-        input[type="password"] {
+        input[type="text"] {
             width: 100%;
             padding: 12px 15px;
             border: 2px solid #e0e0e0;
@@ -204,30 +203,33 @@ class ConfigServer:
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎵 Album Display</h1>
-        <p class="subtitle">Configure your album art display</p>
+        <p class="subtitle">Configure your audio sources</p>
+        
+        <div class="info-box">
+            💡 This configuration page is always available at <strong>http://albumdisplay.local</strong>
+        </div>
         
         <div id="status" class="status"></div>
-        
-        <!-- WiFi Section -->
-        <div class="section">
-            <h3>
-                <span class="section-icon">📶</span>
-                WiFi Network
-            </h3>
-            <input type="text" id="ssid" placeholder="Network Name (SSID)" required>
-            <input type="password" id="password" placeholder="WiFi Password" required>
-        </div>
         
         <!-- Audio Source Section -->
         <div class="section">
             <h3>
                 <span class="section-icon">🎵</span>
-                Audio Source
+                Audio Sources
                 <span id="audio-connected" class="connected-badge" style="display: none;">Connected</span>
             </h3>
             
@@ -291,21 +293,9 @@ class ConfigServer:
         }
         
         async function saveConfig() {
-            const ssid = document.getElementById('ssid').value.trim();
-            const password = document.getElementById('password').value;
             const wiim = document.getElementById('wiim').value.trim();
             
             // Validation
-            if (!ssid) {
-                showStatus('Please enter WiFi network name', 'error');
-                return;
-            }
-            
-            if (!password) {
-                showStatus('Please enter WiFi password', 'error');
-                return;
-            }
-            
             if (!spotifyTokens && !wiim) {
                 showStatus('Please connect Spotify or enter WiiM IP address', 'error');
                 return;
@@ -313,8 +303,6 @@ class ConfigServer:
             
             // Build config object
             const config = {
-                wifi_ssid: ssid,
-                wifi_password: password,
                 wiim_ip: wiim || null
             };
             
@@ -329,7 +317,7 @@ class ConfigServer:
             const btn = document.getElementById('saveBtn');
             const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = 'Configuring<span class="loading"></span>';
+            btn.innerHTML = 'Saving<span class="loading"></span>';
             
             try {
                 const response = await fetch('/config', {
@@ -341,19 +329,19 @@ class ConfigServer:
                 const result = await response.json();
                 
                 if (result.success) {
-                    showStatus('✓ Configuration saved! Device is connecting to your WiFi...', 'success');
+                    showStatus('✓ Configuration saved! Display will restart in 3 seconds...', 'success');
                     
                     // Disable form
                     document.querySelectorAll('input, button').forEach(el => el.disabled = true);
                     
                     // Show final message
                     setTimeout(() => {
-                        showStatus('✓ Setup complete! Your album display is now running. You can close this page.', 'success');
+                        showStatus('✓ Display restarting. Refresh this page in 10 seconds to reconfigure.', 'success');
                     }, 3000);
                 } else {
-                    let errorMsg = 'Configuration failed:\n';
+                    let errorMsg = 'Configuration failed: ';
                     for (const [key, msg] of Object.entries(result.errors || {})) {
-                        errorMsg += `${key}: ${msg}\n`;
+                        errorMsg += `${key}: ${msg}. `;
                     }
                     showStatus(errorMsg, 'error');
                     btn.disabled = false;
@@ -368,15 +356,10 @@ class ConfigServer:
         
         // Enable save button when form is filled
         function checkForm() {
-            const ssid = document.getElementById('ssid').value;
-            const password = document.getElementById('password').value;
             const hasAudio = spotifyTokens || document.getElementById('wiim').value;
-            
-            document.getElementById('saveBtn').disabled = !(ssid && password && hasAudio);
+            document.getElementById('saveBtn').disabled = !hasAudio;
         }
         
-        document.getElementById('ssid').addEventListener('input', checkForm);
-        document.getElementById('password').addEventListener('input', checkForm);
         document.getElementById('wiim').addEventListener('input', checkForm);
     </script>
 </body>
