@@ -102,6 +102,13 @@ class ConfigServer:
             transition: border-color 0.3s;
         }
         
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
         input:focus {
             outline: none;
             border-color: #667eea;
@@ -131,16 +138,6 @@ class ConfigServer:
         .btn-primary:disabled {
             background: #ccc;
             cursor: not-allowed;
-        }
-        
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .btn-secondary:hover {
-            background: #e0e0e0;
         }
         
         .status {
@@ -173,16 +170,6 @@ class ConfigServer:
             border: 1px solid #bee5eb;
         }
         
-        .connected-badge {
-            display: inline-block;
-            background: #28a745;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        
         .helper-text {
             font-size: 13px;
             color: #666;
@@ -212,6 +199,21 @@ class ConfigServer:
             border-radius: 4px;
             font-size: 14px;
         }
+        
+        .test-mode-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border: 1px solid #ffc107;
+        }
+        
+        .test-mode-box label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -220,25 +222,28 @@ class ConfigServer:
         <p class="subtitle">Configure your audio sources</p>
         
         <div class="info-box">
-            💡 This configuration page is always available at <strong>http://albumdisplay.local</strong>
+            💡 This configuration page is always available at <strong>http://10.0.0.195</strong>
         </div>
         
         <div id="status" class="status"></div>
         
-        <!-- Audio Source Section -->
+        <!-- WiiM Section -->
         <div class="section">
             <h3>
-                <span class="section-icon">🎵</span>
-                Audio Sources
-                <span id="audio-connected" class="connected-badge" style="display: none;">Connected</span>
+                <span class="section-icon">📻</span>
+                WiiM Device
             </h3>
             
-            <button class="btn-secondary" onclick="connectSpotify()">
-                Connect Spotify Account
-            </button>
-            
-            <input type="text" id="wiim" placeholder="WiiM IP Address (optional)">
-            <p class="helper-text">Find WiiM IP in the WiiM app settings. Leave blank if using Spotify only.</p>
+            <input type="text" id="wiim" placeholder="WiiM IP Address (optional for testing)">
+            <p class="helper-text">Find WiiM IP in the WiiM app settings → Device Info</p>
+        </div>
+        
+        <!-- Test Mode Section -->
+        <div class="test-mode-box">
+            <label>
+                <input type="checkbox" id="test-mode">
+                <span><strong>Test Mode</strong> - Cycle through colored test images (for setup/testing)</span>
+            </label>
         </div>
         
         <!-- Save Button -->
@@ -248,26 +253,9 @@ class ConfigServer:
     </div>
     
     <script>
-        let spotifyTokens = null;
-        
-        // Check for Spotify tokens in URL (after OAuth redirect)
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('access_token')) {
-            spotifyTokens = {
-                access_token: params.get('access_token'),
-                refresh_token: params.get('refresh_token'),
-                expires_in: params.get('expires_in')
-            };
-            document.getElementById('audio-connected').style.display = 'inline-block';
-            showStatus('Spotify account connected!', 'success');
-            
-            // Clean URL
-            window.history.replaceState({}, document.title, '/');
-        }
-        
         function showStatus(message, type) {
             const status = document.getElementById('status');
-            status.textContent = message;
+            status.innerHTML = message;
             status.className = 'status ' + type + ' show';
         }
         
@@ -275,43 +263,16 @@ class ConfigServer:
             document.getElementById('status').classList.remove('show');
         }
         
-        function connectSpotify() {
-            showStatus('Redirecting to Spotify...', 'info');
-            
-            // TODO: Replace with your Spotify Client ID
-            const clientId = 'YOUR_SPOTIFY_CLIENT_ID';
-            const redirectUri = window.location.origin + '/spotify-callback';
-            const scopes = 'user-read-currently-playing user-read-playback-state';
-            
-            const authUrl = 'https://accounts.spotify.com/authorize?' +
-                'client_id=' + encodeURIComponent(clientId) +
-                '&response_type=code' +
-                '&redirect_uri=' + encodeURIComponent(redirectUri) +
-                '&scope=' + encodeURIComponent(scopes);
-            
-            window.location.href = authUrl;
-        }
-        
         async function saveConfig() {
             const wiim = document.getElementById('wiim').value.trim();
+            const testMode = document.getElementById('test-mode').checked;
             
-            // Validation
-            if (!spotifyTokens && !wiim) {
-                showStatus('Please connect Spotify or enter WiiM IP address', 'error');
-                return;
-            }
             
             // Build config object
             const config = {
-                wiim_ip: wiim || null
+                wiim_ip: wiim || null,
+                test_mode: testMode
             };
-            
-            // Add Spotify tokens if available
-            if (spotifyTokens) {
-                config.spotify_access_token = spotifyTokens.access_token;
-                config.spotify_refresh_token = spotifyTokens.refresh_token;
-                config.spotify_token_expiry = Date.now() + (spotifyTokens.expires_in * 1000);
-            }
             
             // Show loading state
             const btn = document.getElementById('saveBtn');
@@ -353,14 +314,6 @@ class ConfigServer:
                 btn.innerHTML = originalText;
             }
         }
-        
-        // Enable save button when form is filled
-        function checkForm() {
-            const hasAudio = spotifyTokens || document.getElementById('wiim').value;
-            document.getElementById('saveBtn').disabled = !hasAudio;
-        }
-        
-        document.getElementById('wiim').addEventListener('input', checkForm);
     </script>
 </body>
 </html>

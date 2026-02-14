@@ -11,8 +11,12 @@ class DisplayManager:
         options.parallel = 1
         options.hardware_mapping = 'adafruit-hat'
         options.gpio_slowdown = 5
-        options.disable_hardware_pulsing = True
-        
+        options.disable_hardware_pulsing = False
+        options.brightness = 60
+        options.pwm_bits = 11
+        options.pwm_lsb_nanoseconds = 130
+        options.limit_refresh_rate_hz = 0
+
         self.matrix = RGBMatrix(options=options)
         self.current_image = None
     
@@ -92,3 +96,45 @@ class DisplayManager:
         """Clear the display"""
         self.matrix.Clear()
         self.current_image = None
+
+    def show_waiting_message(self):
+       """Display 'Waiting for music...' message"""
+       image = Image.new('RGB', (64, 64), color=(0, 0, 0))
+       draw = ImageDraw.Draw(image)
+       
+       try:
+           font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
+       except:
+           font = ImageFont.load_default()
+       
+       # Split message into lines
+       lines = ["Waiting", "for", "music..."]
+       y_start = 12
+       
+       for line in lines:
+           bbox = draw.textbbox((0, 0), line, font=font)
+           text_width = bbox[2] - bbox[0]
+           x = (64 - text_width) // 2
+           draw.text((x, y_start), line, fill=(100, 100, 100), font=font)
+           y_start += 14
+       
+       self.matrix.SetImage(image.convert('RGB'))
+       self.current_image = image
+       
+    def crossfade(self, old_image, new_image, steps=10):
+       """Crossfade between two images"""
+       if old_image.size != (64, 64):
+           old_image = old_image.resize((64, 64), Image.LANCZOS)
+       if new_image.size != (64, 64):
+           new_image = new_image.resize((64, 64), Image.LANCZOS)
+       
+       old_image = old_image.convert('RGB')
+       new_image = new_image.convert('RGB')
+       
+       for step in range(steps + 1):
+           alpha = step / steps
+           blended = Image.blend(old_image, new_image, alpha)
+           self.matrix.SetImage(blended)
+           time.sleep(0.05)  # 50ms per step = 500ms total fade
+       
+       self.current_image = new_image

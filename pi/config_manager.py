@@ -34,5 +34,7 @@ class ConfigManager:
     
     def is_configured(self):
         """Check if device has been configured"""
-        return (self.config.get('wifi_ssid') and 
-                (self.config.get('spotify_access_token') or self.config.get('wiim_ip')))
+        # Configured if we have test mode enabled, OR if we have WiiM
+        return (self.config.get('test_mode') or 
+                self.config.get('wiim_ip') or 
+                self.config.get('configured'))
