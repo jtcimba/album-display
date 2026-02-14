@@ -29,7 +29,7 @@ class ConfigServer:
         def get_status():
             return jsonify({'ready': True, 'version': '1.0'})
     
-def get_html_template(self):
+    def get_html_template(self):
         """Return the configuration web page HTML"""
         return '''
 <!DOCTYPE html>
