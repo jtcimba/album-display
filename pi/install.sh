@@ -30,13 +30,6 @@ sudo apt install -y \
     cython3 \
     libcap2-bin
 
-echo "Configuring network settings..."
-# Note: We're NOT restarting NetworkManager to avoid SSH disconnection
-# The unmanaged setting will take effect on next reboot
-sudo mkdir -p /etc/NetworkManager/conf.d
-echo '[keyfile]' | sudo tee /etc/NetworkManager/conf.d/99-unmanage-wlan.conf > /dev/null
-echo 'unmanaged-devices=interface-name:wlan0' | sudo tee -a /etc/NetworkManager/conf.d/99-unmanage-wlan.conf > /dev/null
-
 # Install RGB Matrix library
 if [ ! -d "/home/pi/rpi-rgb-led-matrix" ]; then
     echo "Installing RGB Matrix library (this takes 3-5 minutes)..."
@@ -45,6 +38,8 @@ if [ ! -d "/home/pi/rpi-rgb-led-matrix" ]; then
     cd rpi-rgb-led-matrix
     make build-python PYTHON=$(which python3)
     sudo make install-python PYTHON=$(which python3)
+else
+    echo "RGB Matrix library already installed, skipping..."
 fi
 
 # Install Python dependencies
@@ -57,44 +52,20 @@ echo "Configuring permissions..."
 PYTHON_PATH=$(readlink -f $(which python3))
 sudo setcap CAP_NET_BIND_SERVICE=+eip $PYTHON_PATH
 
-# Create systemd service file
-echo "Creating systemd service..."
-sudo bash -c 'cat > /etc/systemd/system/album-display.service' << 'EOF'
-[Unit]
-Description=Album Display
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/album-display/pi
-ExecStart=/usr/bin/python3 /home/pi/album-display/pi/main.py
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable service (will start on boot)
-sudo systemctl enable album-display.service
-
 echo ""
 echo "============================================"
 echo "Installation Complete!"
 echo "============================================"
 echo ""
-echo "IMPORTANT: Reboot for network settings to take effect:"
-echo "  sudo reboot"
+echo "Next steps:"
+echo "  1. Test manually:"
+echo "     cd ~/album-display/pi"
+echo "     python3 main.py"
 echo ""
-echo "After reboot:"
-echo "  1. SSH back in: ssh pi@albumdisplay.local"
-echo "  2. Start service: sudo systemctl start album-display"
-echo "  3. View logs: sudo journalctl -u album-display -f"
-echo "  4. Configure: http://albumdisplay.local"
+echo "  2. Configure display:"
+echo "     Open browser to http://albumdisplay.local"
+echo ""
+echo "  3. After testing, enable auto-start:"
+echo "     cd ~/album-display/pi"
+echo "     ./enable-autostart.sh"
 echo ""
